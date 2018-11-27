@@ -1,8 +1,9 @@
 .text
 	.global _start
 _start:
-	@Load value x from memory
-	LDR r0, =x
+	
+	LDR r0, =x			@ load the memory address of x into r0
+	LDR r0, [r0]			@ load the value at memory address in r0 into r0
 	@Index into each table, branch to loops for that	
 	@Indicate end of program execution somewhere?
 	SWI 0x11
