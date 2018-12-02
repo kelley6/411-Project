@@ -1,17 +1,9 @@
-@ CMSC411
-@ 12/2/2017
-@ Term Project
-@ Written by Evan Andre, Benjamin Hazlett, and Stephanie Tam
-@ This project calculates sin and cos using the cordic in ARM.
-@ It then computes tan by doing sin / cos without using division.
-@ It then stores the 3 results in memory.
-
-
-
+@CMSC 411 Project
+@Kelley Schmidt, Alayana Stepp, Spencer Teolis, Ian Moskunas
+@Computes sine and cosine and stores them in memory
 
 .data
-@ Multiply each piece of data by 2^16=65536 to forego using floating point
-@   registers and have extra precision.
+@ Multiplied each number by 2^16=65536 to avoid floats
 
 @ placeholder for where to store values in memory later
 values_store:
@@ -23,12 +15,14 @@ currCos:  @ x
 
 currSin:  @ y
   .int  0
+  
+Sine: .word 0
 
-@ Original Angles:
+@ Original angles:
 @   45.0, 26.565, 14.0362, 7.12502, 3.57633, 1.78991, 0.895174
 @   0.447614, 0.223811, 0.111906, 0.055953, 0.027977
 
-@ Multiply each piece of data by 2^16
+@ Multiply each by 2^16, arctanh angles for cordic method
 angles:
   .int  2949120, 1740963, 919876, 466945, 234378, 117303, 58666
   .int  29334, 14667, 7333, 3666, 1833
@@ -37,17 +31,18 @@ angles:
 iter:
   .int  12
 
-@ Test angle, z
+@ Input angle z
 currAngle:
   .int  4643985         @ z = 70.86159
 
+@Begin program here
 
 .text
 main:
   LDR    R0, =iter           @ load & store number of iterations
   LDR    R2, [R0]
-  SUB    R2, R2, #1          @ size - 1 to not go out-of-bounds
-  MOV    R1, #0              @ for-loop counter, i
+  SUB    R2, R2, #1          @ subtract 1 from size so we stay in bounds
+  MOV    R1, #0              @ counter for for loop iterations
 
   LDR    R0, =currAngle      @ load & store currAngle
   LDR    R3, [R0]
@@ -55,9 +50,9 @@ main:
   LDR    R4, [R0]
   LDR    R0, =currSin        @ load & store currSin
   LDR    R5, [R0]
-  LDR    R0, =angles         @ load angles[]
+  LDR    R0, =angles         @ load angles[] table
 
-@ Handle edge cases
+@ Handle simple edge cases
 currAngle0:
   CMP    R3, #0              @ if currAngle = 0
   BNE    currAngle90
@@ -76,8 +71,8 @@ currAngle90:
 
 @ Back to main part of code
 for_loop:
-  MOV    R6, R1
-  LDR    R7, [R0, R6, LSL#2] @ get angles[i] w/ offset
+  MOV    R6, R1					
+  LDR    R7, [R0, R6, LSL#2] @ get angles[i] w/ offset by shifting
 
   MOV    R8, R4              @ tempCos <-- currCos
   MOV    R9, R5              @ tempSin <-- currSin
@@ -102,41 +97,9 @@ end_elif:
   CMP    R1, R2              @ compare to make sure at right iteration
   BNE    for_loop
 
-
-@ division to calculate tan(z) = sin(z)/cos(z)
-tan_div:
-  MOV    R1, R5              @ move sin and cos into R1 and R2
-  MOV    R2, R4
-  MOV    R1, R1, LSR #4      @ shift right 4 so we don't shift more than 32 left, total
-  CMP    R2, #0              @ check for divide by zero!
-  BEQ    divide_end
-
-  MOV    R6, #0              @ clear R6 to accumulate result
-  MOV    R3, #1              @ set bit 0 in R3, which will be shifted left then right. keeps track which bit should be added to tan
-  LSL    R3, #16             @ since there is 16 bits to the right of the decimal point it needs to be shifted 16 bits
-
-start:
-  CMP    R2, R1
-  MOVLS  R2, R2, LSL #1      @ shift R2 left until it is about to be bigger than R1
-  MOVLS  R3, R3, LSL #1      @ shift R3 left in parallel in order to flag how far we have to go (also indicates # of iterations)
-  BLS    start
-
-next:
-  CMP    R1, R2              @ carry set if R1 > R2
-  SUBCS  R1, R1, R2          @ R1 - R2, if it would give a positive answer
-  ADDCS  R6, R6, R3          @ add the current bit in R3 to accumulating answer in R6
-
-  MOVS   R3, R3, LSR #1      @ shift R3 right into carry flag
-  MOVCC  R2, R2, LSR #1      @ if R3 bit0 = 0, shift R2 right
-  BCC    next                @ if carry not clear, R3 shifted back to where it started, then end
-
-divide_end:
-  MOV    R6, R6, LSL #4     @ must shift back since initially shifting by 4 bits
-
 exit:
   LDR    R0, =values_store   @ store values in "array" in mem
   STR    R4, [R0] 			@cosine
   STR    R5, [R0, #4]		@sine
-  STR    R6, [R0, #8]		@tan
 
   SWI   0x11
